@@ -874,6 +874,41 @@ export class Moodle implements INodeType {
                         description: 'Timezone of the user (e.g., America/New_York, Europe/London, Asia/Tokyo)',
                         placeholder: 'America/New_York',
                     },
+                    {
+                        displayName: 'First Name',
+                        name: 'firstname',
+                        type: 'string',
+                        default: '',
+                        description: 'First name of the user',
+                    },
+                    {
+                        displayName: 'Last Name',
+                        name: 'lastname',
+                        type: 'string',
+                        default: '',
+                        description: 'Last name of the user',
+                    },
+                    {
+                        displayName: 'Email',
+                        name: 'email',
+                        type: 'string',
+                        default: '',
+                        description: 'Email address of the user',
+                    },
+                    {
+                        displayName: 'Confirmed',
+                        name: 'confirmed',
+                        type: 'boolean',
+                        default: true,
+                        description: 'Whether the user account is confirmed',
+                    },
+                    {
+                        displayName: 'Suspended',
+                        name: 'suspended',
+                        type: 'boolean',
+                        default: false,
+                        description: 'Whether the user account is suspended',
+                    },
                 ],
             },
 
@@ -1043,6 +1078,14 @@ export class Moodle implements INodeType {
                         };
 
                         if (Object.keys(additionalFields).length > 0) {
+                            // Convert booleans to 1/0 for Moodle
+                            if (additionalFields.confirmed !== undefined) {
+                                additionalFields.confirmed = additionalFields.confirmed ? 1 : 0;
+                            }
+                            if (additionalFields.suspended !== undefined) {
+                                additionalFields.suspended = additionalFields.suspended ? 1 : 0;
+                            }
+                            
                             const flattenedFields = flattenObject(additionalFields, 'users[0]');
                             Object.assign(userParams, flattenedFields);
                         }
@@ -1165,6 +1208,14 @@ export class Moodle implements INodeType {
                         };
 
                         if (Object.keys(additionalFields).length > 0) {
+                            // Convert booleans to 1/0 for Moodle
+                            if (additionalFields.confirmed !== undefined) {
+                                additionalFields.confirmed = additionalFields.confirmed ? 1 : 0;
+                            }
+                            if (additionalFields.suspended !== undefined) {
+                                additionalFields.suspended = additionalFields.suspended ? 1 : 0;
+                            }
+                            
                             const flattenedFields = flattenObject(additionalFields, 'users[0]');
                             Object.assign(updateParams, flattenedFields);
                         }
