@@ -1043,6 +1043,14 @@ export class Moodle implements INodeType {
                         };
 
                         if (Object.keys(additionalFields).length > 0) {
+                            // Convert booleans to 1/0 for Moodle
+                            if (additionalFields.confirmed !== undefined) {
+                                additionalFields.confirmed = additionalFields.confirmed ? 1 : 0;
+                            }
+                            if (additionalFields.suspended !== undefined) {
+                                additionalFields.suspended = additionalFields.suspended ? 1 : 0;
+                            }
+                            
                             const flattenedFields = flattenObject(additionalFields, 'users[0]');
                             Object.assign(userParams, flattenedFields);
                         }
@@ -1165,6 +1173,14 @@ export class Moodle implements INodeType {
                         };
 
                         if (Object.keys(additionalFields).length > 0) {
+                            // Convert booleans to 1/0 for Moodle
+                            if (additionalFields.confirmed !== undefined) {
+                                additionalFields.confirmed = additionalFields.confirmed ? 1 : 0;
+                            }
+                            if (additionalFields.suspended !== undefined) {
+                                additionalFields.suspended = additionalFields.suspended ? 1 : 0;
+                            }
+                            
                             const flattenedFields = flattenObject(additionalFields, 'users[0]');
                             Object.assign(updateParams, flattenedFields);
                         }
