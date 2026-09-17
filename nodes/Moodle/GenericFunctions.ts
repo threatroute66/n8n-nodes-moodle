@@ -12,12 +12,30 @@ import {
     NodeApiError,
 } from 'n8n-workflow';
 
+const DEFAULT_TIMEOUT = 30000;
+const MIN_TIMEOUT = 1000;
+const MAX_TIMEOUT = 300000;
+
+/**
+ * Coerce a timeout to a sane number of milliseconds, or undefined when it is
+ * not usable. The node parameter's `minValue`/`maxValue` are UI-only hints and
+ * are bypassed by expressions, so the bounds have to be enforced here too.
+ */
+function clampTimeout(value: unknown): number | undefined {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return undefined;
+    }
+    return Math.min(Math.max(parsed, MIN_TIMEOUT), MAX_TIMEOUT);
+}
+
 export async function moodleApiRequest(
     this: IExecuteFunctions | ILoadOptionsFunctions | IHookFunctions | IWebhookFunctions,
     method: IHttpRequestMethods,
     body: IDataObject = {},
     qs: IDataObject = {},
-    customTimeout: number = 30000,
+    customTimeout?: number,
+    itemIndex = 0,
 ): Promise<any> {
     const credentials = await this.getCredentials('moodleApi');
     const url = credentials.url as string;
@@ -43,11 +61,13 @@ export async function moodleApiRequest(
     
     const bodyString = formData.toString();
 
-    // Allow override via node parameter when available
-    let timeout = customTimeout;
+    // The caller's hint is the baseline; the node parameter overrides it when set.
+    // Read it for the item being processed - not item 0 - so a per-item
+    // expression on the timeout field resolves against the right item.
+    let timeout = clampTimeout(customTimeout) ?? DEFAULT_TIMEOUT;
     try {
-        const nodeTimeout = this.getNodeParameter?.('timeout', 0) as number;
-        if (nodeTimeout && Number.isFinite(nodeTimeout) && nodeTimeout > 0) {
+        const nodeTimeout = clampTimeout(this.getNodeParameter?.('timeout', itemIndex));
+        if (nodeTimeout !== undefined) {
             timeout = nodeTimeout;
         }
     } catch {}
@@ -124,7 +144,7 @@ export async function moodleApiRequest(
                     break;
                 case 'ETIMEDOUT':
                     errorMessage = 'Connection timeout - Server is not responding';
-                    errorDescription = 'Request timed out after 30 seconds';
+                    errorDescription = `Request timed out after ${timeout}ms`;
                     break;
                 default:
                     errorMessage = error.message || errorMessage;
@@ -150,6 +170,8 @@ export async function moodleApiRequestAllItems(
     method: IHttpRequestMethods,
     body: IDataObject = {},
     qs: IDataObject = {},
+    customTimeout?: number,
+    itemIndex = 0,
 ): Promise<any> {
-    return moodleApiRequest.call(this, method, body, qs);
+    return moodleApiRequest.call(this, method, body, qs, customTimeout, itemIndex);
 }
