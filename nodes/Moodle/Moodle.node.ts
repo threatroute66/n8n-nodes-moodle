@@ -56,9 +56,10 @@ export class Moodle implements INodeType {
                 name: 'timeout',
                 type: 'number',
                 default: 120000,
-                description: 'Max time to wait for Moodle API responses; increase for slow operations like course duplication',
+                description: 'Max time to wait for Moodle API responses; increase for slow operations like course duplication. Capped at 300000 ms (5 minutes).',
                 typeOptions: {
                     minValue: 1000,
+                    maxValue: 300000,
                 },
             },
             // Resource Selection
@@ -621,8 +622,8 @@ export class Moodle implements INodeType {
                         operation: ['duplicate'],
                     },
                 },
-                default: true,
-                description: 'Whether the duplicated course is visible after creation',
+                default: false,
+                description: 'Whether the duplicated course is visible after creation. Off by default so a copy of a hidden or restricted course is not exposed to students before it has been reviewed.',
             },
             {
                 displayName: 'Duplicate Options',
@@ -1251,7 +1252,7 @@ export class Moodle implements INodeType {
                             Object.assign(userParams, flattenedFields);
                         }
 
-                        responseData = await moodleApiRequest.call(this, 'POST', {}, userParams);
+                        responseData = await moodleApiRequest.call(this, 'POST', {}, userParams, undefined, i);
                         
                         // Handle the response - Moodle returns an array of created users
                         if (Array.isArray(responseData) && responseData.length > 0) {
@@ -1276,7 +1277,9 @@ export class Moodle implements INodeType {
                                 wsfunction: 'core_user_get_users_by_field',
                                 field: 'id',
                                 'values[0]': userId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                         
                         responseData = responseData[0];
@@ -1308,7 +1311,7 @@ export class Moodle implements INodeType {
                         console.log(`Searching users by ${searchBy} with value: ${params['criteria[0][value]']}`);
                         
                         try {
-                            responseData = await moodleApiRequest.call(this, 'POST', {}, params);
+                            responseData = await moodleApiRequest.call(this, 'POST', {}, params, undefined, i);
                         } catch (error) {
                             // If search by email fails, try alternative method
                             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1320,7 +1323,7 @@ export class Moodle implements INodeType {
                                 params['criteria[0][value]'] = '@';
                                 
                                 try {
-                                    responseData = await moodleApiRequest.call(this, 'POST', {}, params);
+                                    responseData = await moodleApiRequest.call(this, 'POST', {}, params, undefined, i);
                                 } catch (secondError) {
                                     // If that also fails, try getting specific user IDs
                                     console.log('Alternative search failed, falling back to empty criteria');
@@ -1328,7 +1331,7 @@ export class Moodle implements INodeType {
                                     delete params['criteria[0][value]'];
                                     params['criteria'] = [];
                                     
-                                    responseData = await moodleApiRequest.call(this, 'POST', {}, params);
+                                    responseData = await moodleApiRequest.call(this, 'POST', {}, params, undefined, i);
                                 }
                             } else {
                                 throw error;
@@ -1381,7 +1384,7 @@ export class Moodle implements INodeType {
                             Object.assign(updateParams, flattenedFields);
                         }
 
-                        responseData = await moodleApiRequest.call(this, 'POST', {}, updateParams);
+                        responseData = await moodleApiRequest.call(this, 'POST', {}, updateParams, undefined, i);
                     }
                     
                     if (operation === 'delete') {
@@ -1394,7 +1397,9 @@ export class Moodle implements INodeType {
                             {
                                 wsfunction: 'core_user_delete_users',
                                 'userids[0]': userId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                         
                         // Handle null response for successful deletion
@@ -1446,7 +1451,7 @@ export class Moodle implements INodeType {
                         }
 
                         console.log(`Creating course with shortname: ${shortname}`);
-                        responseData = await moodleApiRequest.call(this, 'POST', {}, courseParams);
+                        responseData = await moodleApiRequest.call(this, 'POST', {}, courseParams, undefined, i);
                         
                         // Log the raw response for debugging
                         console.log('Course creation response:', JSON.stringify(responseData, null, 2));
@@ -1513,7 +1518,8 @@ export class Moodle implements INodeType {
                             'POST',
                             {},
                             duplicateParams,
-                            120000 // duplication can be a very slow operation
+                            120000, // duplication can be a very slow operation
+                            i,
                         );
 
                         // API returns the new course record
@@ -1536,7 +1542,9 @@ export class Moodle implements INodeType {
                                 wsfunction: 'core_course_get_courses_by_field',
                                 field: 'id',
                                 value: courseId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                         
                         responseData = responseData.courses[0];
@@ -1549,7 +1557,9 @@ export class Moodle implements INodeType {
                             {},
                             {
                                 wsfunction: 'core_course_get_courses',
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                     }
                     
@@ -1567,7 +1577,7 @@ export class Moodle implements INodeType {
                             Object.assign(updateParams, flattenedFields);
                         }
 
-                        responseData = await moodleApiRequest.call(this, 'POST', {}, updateParams);
+                        responseData = await moodleApiRequest.call(this, 'POST', {}, updateParams, undefined, i);
                     }
                     
                     if (operation === 'delete') {
@@ -1580,7 +1590,9 @@ export class Moodle implements INodeType {
                             {
                                 wsfunction: 'core_course_delete_courses',
                                 'courseids[0]': courseId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                         
                         // Handle null response for successful deletion
@@ -1599,7 +1611,9 @@ export class Moodle implements INodeType {
                             {
                                 wsfunction: 'core_enrol_get_enrolled_users',
                                 courseid: courseId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                     }
                     
@@ -1610,7 +1624,9 @@ export class Moodle implements INodeType {
                             {},
                             {
                                 wsfunction: 'core_course_get_categories',
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                     }
                 }
@@ -1631,7 +1647,9 @@ export class Moodle implements INodeType {
                                 'enrolments[0][userid]': userId,
                                 'enrolments[0][courseid]': courseId,
                                 'enrolments[0][roleid]': roleId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                     }
                     
@@ -1647,7 +1665,9 @@ export class Moodle implements INodeType {
                                 wsfunction: 'enrol_manual_unenrol_users',
                                 'enrolments[0][userid]': userId,
                                 'enrolments[0][courseid]': courseId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                     }
                     
@@ -1661,7 +1681,9 @@ export class Moodle implements INodeType {
                             {
                                 wsfunction: 'core_enrol_get_users_courses',
                                 userid: userId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                     }
                     
@@ -1675,7 +1697,9 @@ export class Moodle implements INodeType {
                             {
                                 wsfunction: 'core_enrol_get_enrolled_users',
                                 courseid: courseId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                     }
                 }
@@ -1694,7 +1718,9 @@ export class Moodle implements INodeType {
                             {
                                 wsfunction: 'gradereport_overview_get_course_grades',
                                 userid: userId,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                         
                         // Extract grades array if present
@@ -1734,7 +1760,9 @@ export class Moodle implements INodeType {
                                 {
                                     wsfunction: 'gradereport_overview_view_grade_report',
                                     userid: userId,
-                                }
+                                },
+                                undefined,
+                                i,
                             );
                             
                             // This function typically returns a status rather than actual grades
@@ -1769,7 +1797,9 @@ export class Moodle implements INodeType {
                                 wsfunction: 'core_message_send_instant_messages',
                                 'messages[0][touserid]': toUserId,
                                 'messages[0][text]': messageText,
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                         
                         // Extract the first message and add helpful info
@@ -1813,7 +1843,7 @@ export class Moodle implements INodeType {
                             }
                             
                             console.log('Getting received messages...');
-                            const receivedResponse = await moodleApiRequest.call(this, 'POST', {}, receivedParams);
+                            const receivedResponse = await moodleApiRequest.call(this, 'POST', {}, receivedParams, undefined, i);
                             
                             if (receivedResponse && receivedResponse.messages && Array.isArray(receivedResponse.messages)) {
                                 console.log(`Found ${receivedResponse.messages.length} received messages`);
@@ -1841,7 +1871,7 @@ export class Moodle implements INodeType {
                             }
                             
                             console.log('Getting sent messages...');
-                            const sentResponse = await moodleApiRequest.call(this, 'POST', {}, sentParams);
+                            const sentResponse = await moodleApiRequest.call(this, 'POST', {}, sentParams, undefined, i);
                             
                             if (sentResponse && sentResponse.messages && Array.isArray(sentResponse.messages)) {
                                 console.log(`Found ${sentResponse.messages.length} sent messages`);
@@ -1893,7 +1923,9 @@ export class Moodle implements INodeType {
                                     limitfrom: 0,
                                     limitnum: 50,
                                     // Removed includecontactrequests and includeprivacyinfo as they're not supported
-                                }
+                                },
+                                undefined,
+                                i,
                             );
                             
                             // Handle the response - extract conversations array if present
@@ -1941,7 +1973,9 @@ export class Moodle implements INodeType {
                                     limitfrom: 0,
                                     limitnum: 100,
                                     // Removed 'newest' parameter - it might not be supported in all versions
-                                }
+                                },
+                                undefined,
+                                i,
                             );
                             
                             // Handle the response - extract messages array if present
@@ -1983,7 +2017,9 @@ export class Moodle implements INodeType {
                             {},
                             {
                                 wsfunction: 'core_webservice_get_site_info',
-                            }
+                            },
+                            undefined,
+                            i,
                         );
                         
                         // Add helpful information about available functions
