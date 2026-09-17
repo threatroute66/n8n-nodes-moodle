@@ -6,6 +6,7 @@ import {
     INodeTypeDescription,
     ILoadOptionsFunctions,
     INodePropertyOptions,
+    INode,
     NodeConnectionType,
     NodeOperationError,
 } from 'n8n-workflow';
@@ -16,6 +17,27 @@ import {
 
 // Import version info
 import { VERSION_INFO } from './version';
+
+/**
+ * Parse a required Moodle record ID.
+ *
+ * The ID fields are declared as `type: 'number'` with an empty-string default and
+ * rely on `required`, which is a UI-only constraint that an expression bypasses.
+ * A blank or malformed value therefore arrives here as '' or NaN and would be sent
+ * to Moodle as an empty parameter, producing an opaque server-side error. Fail here
+ * instead, naming the field.
+ */
+function parseRequiredId(node: INode, value: unknown, displayName: string, itemIndex: number): number {
+    const parsed = Number(value);
+    if (value === '' || value === null || value === undefined || !Number.isInteger(parsed) || parsed <= 0) {
+        throw new NodeOperationError(
+            node,
+            `${displayName} must be a positive whole number, but received ${JSON.stringify(value) ?? 'undefined'}`,
+            { itemIndex },
+        );
+    }
+    return parsed;
+}
 
 // Helper function to flatten object for Moodle API
 function flattenObject(obj: IDataObject, prefix: string): IDataObject {
@@ -1469,7 +1491,12 @@ export class Moodle implements INodeType {
                     }
                     
                     if (operation === 'duplicate') {
-                        const sourceCourseId = this.getNodeParameter('sourceCourseId', i) as number;
+                        const sourceCourseId = parseRequiredId(
+                            this.getNode(),
+                            this.getNodeParameter('sourceCourseId', i, ''),
+                            'Source Course ID',
+                            i,
+                        );
                         const newFullname = this.getNodeParameter('newFullname', i) as string;
                         const newShortname = this.getNodeParameter('newShortname', i) as string;
                         const duplicateCategoryId = this.getNodeParameter('duplicateCategoryId', i, '') as number | string;
