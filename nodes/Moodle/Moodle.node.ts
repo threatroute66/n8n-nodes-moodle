@@ -6,6 +6,7 @@ import {
     INodeTypeDescription,
     ILoadOptionsFunctions,
     INodePropertyOptions,
+    INode,
     NodeConnectionType,
     NodeOperationError,
 } from 'n8n-workflow';
@@ -16,6 +17,27 @@ import {
 
 // Import version info
 import { VERSION_INFO } from './version';
+
+/**
+ * Parse a required Moodle record ID.
+ *
+ * The ID fields are declared as `type: 'number'` with an empty-string default and
+ * rely on `required`, which is a UI-only constraint that an expression bypasses.
+ * A blank or malformed value therefore arrives here as '' or NaN and would be sent
+ * to Moodle as an empty parameter, producing an opaque server-side error. Fail here
+ * instead, naming the field.
+ */
+function parseRequiredId(node: INode, value: unknown, displayName: string, itemIndex: number): number {
+    const parsed = Number(value);
+    if (value === '' || value === null || value === undefined || !Number.isInteger(parsed) || parsed <= 0) {
+        throw new NodeOperationError(
+            node,
+            `${displayName} must be a positive whole number, but received ${JSON.stringify(value) ?? 'undefined'}`,
+            { itemIndex },
+        );
+    }
+    return parsed;
+}
 
 // Helper function to flatten object for Moodle API
 function flattenObject(obj: IDataObject, prefix: string): IDataObject {
@@ -610,7 +632,7 @@ export class Moodle implements INodeType {
                     },
                 },
                 default: '',
-                description: 'Category ID for the duplicated course (optional)',
+                description: 'Category ID for the duplicated course. Leave blank to keep the source course\'s category.',
             },
             {
                 displayName: 'Visible',
@@ -1469,10 +1491,15 @@ export class Moodle implements INodeType {
                     }
                     
                     if (operation === 'duplicate') {
-                        const sourceCourseId = this.getNodeParameter('sourceCourseId', i) as number;
+                        const sourceCourseId = parseRequiredId(
+                            this.getNode(),
+                            this.getNodeParameter('sourceCourseId', i, ''),
+                            'Source Course ID',
+                            i,
+                        );
                         const newFullname = this.getNodeParameter('newFullname', i) as string;
                         const newShortname = this.getNodeParameter('newShortname', i) as string;
-                        const duplicateCategoryId = this.getNodeParameter('duplicateCategoryId', i) as number;
+                        const duplicateCategoryId = this.getNodeParameter('duplicateCategoryId', i, '') as number | string;
                         const duplicateVisible = this.getNodeParameter('duplicateVisible', i) as boolean;
                         const duplicateOptions = this.getNodeParameter('duplicateOptions', i, {}) as IDataObject;
 
@@ -1483,8 +1510,13 @@ export class Moodle implements INodeType {
                             shortname: newShortname,
                         };
 
-                        if (duplicateCategoryId !== undefined && duplicateCategoryId !== null && duplicateCategoryId !== 0) {
-                            duplicateParams.categoryid = duplicateCategoryId;
+                        // The field is a number with an empty-string default, so a blank
+                        // value arrives as '' rather than undefined. Only send categoryid
+                        // when it parses to a real category (Moodle ids start at 1);
+                        // otherwise omit it so Moodle keeps the source course's category.
+                        const parsedCategoryId = Number(duplicateCategoryId);
+                        if (duplicateCategoryId !== '' && Number.isInteger(parsedCategoryId) && parsedCategoryId > 0) {
+                            duplicateParams.categoryid = parsedCategoryId;
                         }
 
                         if (duplicateVisible !== undefined) {
