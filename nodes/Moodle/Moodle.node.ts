@@ -610,7 +610,7 @@ export class Moodle implements INodeType {
                     },
                 },
                 default: '',
-                description: 'Category ID for the duplicated course (optional)',
+                description: 'Category ID for the duplicated course. Leave blank to keep the source course\'s category.',
             },
             {
                 displayName: 'Visible',
@@ -1472,7 +1472,7 @@ export class Moodle implements INodeType {
                         const sourceCourseId = this.getNodeParameter('sourceCourseId', i) as number;
                         const newFullname = this.getNodeParameter('newFullname', i) as string;
                         const newShortname = this.getNodeParameter('newShortname', i) as string;
-                        const duplicateCategoryId = this.getNodeParameter('duplicateCategoryId', i) as number;
+                        const duplicateCategoryId = this.getNodeParameter('duplicateCategoryId', i, '') as number | string;
                         const duplicateVisible = this.getNodeParameter('duplicateVisible', i) as boolean;
                         const duplicateOptions = this.getNodeParameter('duplicateOptions', i, {}) as IDataObject;
 
@@ -1483,8 +1483,13 @@ export class Moodle implements INodeType {
                             shortname: newShortname,
                         };
 
-                        if (duplicateCategoryId !== undefined && duplicateCategoryId !== null && duplicateCategoryId !== 0) {
-                            duplicateParams.categoryid = duplicateCategoryId;
+                        // The field is a number with an empty-string default, so a blank
+                        // value arrives as '' rather than undefined. Only send categoryid
+                        // when it parses to a real category (Moodle ids start at 1);
+                        // otherwise omit it so Moodle keeps the source course's category.
+                        const parsedCategoryId = Number(duplicateCategoryId);
+                        if (duplicateCategoryId !== '' && Number.isInteger(parsedCategoryId) && parsedCategoryId > 0) {
+                            duplicateParams.categoryid = parsedCategoryId;
                         }
 
                         if (duplicateVisible !== undefined) {
