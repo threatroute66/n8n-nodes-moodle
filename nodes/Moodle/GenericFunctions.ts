@@ -17,6 +17,7 @@ export async function moodleApiRequest(
     method: IHttpRequestMethods,
     body: IDataObject = {},
     qs: IDataObject = {},
+    customTimeout: number = 30000,
 ): Promise<any> {
     const credentials = await this.getCredentials('moodleApi');
     const url = credentials.url as string;
@@ -41,12 +42,21 @@ export async function moodleApiRequest(
     }
     
     const bodyString = formData.toString();
-    
+
+    // Allow override via node parameter when available
+    let timeout = customTimeout;
+    try {
+        const nodeTimeout = this.getNodeParameter?.('timeout', 0) as number;
+        if (nodeTimeout && Number.isFinite(nodeTimeout) && nodeTimeout > 0) {
+            timeout = nodeTimeout;
+        }
+    } catch {}
+
     const options: IHttpRequestOptions = {
         method,
         url: fullUrl,
         body: bodyString,
-        timeout: 30000,
+        timeout,
         headers: {
             'User-Agent': 'n8n-moodle-node/1.0.0',
             'Content-Type': 'application/x-www-form-urlencoded',

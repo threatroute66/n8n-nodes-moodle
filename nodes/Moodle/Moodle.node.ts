@@ -51,6 +51,16 @@ export class Moodle implements INodeType {
             },
         ],
         properties: [
+            {
+                displayName: 'Request Timeout (ms)',
+                name: 'timeout',
+                type: 'number',
+                default: 120000,
+                description: 'Max time to wait for Moodle API responses; increase for slow operations like course duplication',
+                typeOptions: {
+                    minValue: 1000,
+                },
+            },
             // Resource Selection
             {
                 displayName: 'Resource',
@@ -152,6 +162,11 @@ export class Moodle implements INodeType {
                         name: 'Get All',
                         value: 'getAll',
                         description: 'Get all courses',
+                    },
+                    {
+                        name: 'Duplicate',
+                        value: 'duplicate',
+                        description: 'Clone an existing course using Moodle duplication',
                     },
                     {
                         name: 'Update',
@@ -501,6 +516,20 @@ export class Moodle implements INodeType {
                 description: 'The course ID',
             },
             {
+                displayName: 'Source Course ID',
+                name: 'sourceCourseId',
+                type: 'number',
+                displayOptions: {
+                    show: {
+                        resource: ['course'],
+                        operation: ['duplicate'],
+                    },
+                },
+                default: '',
+                required: true,
+                description: 'ID of the course to duplicate',
+            },
+            {
                 displayName: 'Course Name',
                 name: 'fullname',
                 type: 'string',
@@ -513,6 +542,20 @@ export class Moodle implements INodeType {
                 default: '',
                 required: true,
                 description: 'Full course name',
+            },
+            {
+                displayName: 'New Course Name',
+                name: 'newFullname',
+                type: 'string',
+                displayOptions: {
+                    show: {
+                        resource: ['course'],
+                        operation: ['duplicate'],
+                    },
+                },
+                default: '',
+                required: true,
+                description: 'Full name for the duplicated course',
             },
             {
                 displayName: 'Short Name',
@@ -529,6 +572,20 @@ export class Moodle implements INodeType {
                 description: 'Course short name (unique identifier)',
             },
             {
+                displayName: 'New Short Name',
+                name: 'newShortname',
+                type: 'string',
+                displayOptions: {
+                    show: {
+                        resource: ['course'],
+                        operation: ['duplicate'],
+                    },
+                },
+                default: '',
+                required: true,
+                description: 'Short name for the duplicated course (must be unique)',
+            },
+            {
                 displayName: 'Category ID',
                 name: 'categoryid',
                 type: 'number',
@@ -540,6 +597,110 @@ export class Moodle implements INodeType {
                 },
                 default: 1,
                 description: 'Course category ID',
+            },
+            {
+                displayName: 'Category ID',
+                name: 'duplicateCategoryId',
+                type: 'number',
+                displayOptions: {
+                    show: {
+                        resource: ['course'],
+                        operation: ['duplicate'],
+                    },
+                },
+                default: '',
+                description: 'Category ID for the duplicated course (optional)',
+            },
+            {
+                displayName: 'Visible',
+                name: 'duplicateVisible',
+                type: 'boolean',
+                displayOptions: {
+                    show: {
+                        resource: ['course'],
+                        operation: ['duplicate'],
+                    },
+                },
+                default: true,
+                description: 'Whether the duplicated course is visible after creation',
+            },
+            {
+                displayName: 'Duplicate Options',
+                name: 'duplicateOptions',
+                type: 'collection',
+                placeholder: 'Add Option',
+                default: {},
+                displayOptions: {
+                    show: {
+                        resource: ['course'],
+                        operation: ['duplicate'],
+                    },
+                },
+                options: [
+                    {
+                        displayName: 'Activities',
+                        name: 'activities',
+                        type: 'boolean',
+                        default: true,
+                        description: 'Copy course activities',
+                    },
+                    {
+                        displayName: 'Blocks',
+                        name: 'blocks',
+                        type: 'boolean',
+                        default: true,
+                        description: 'Copy course blocks',
+                    },
+                    {
+                        displayName: 'Filters',
+                        name: 'filters',
+                        type: 'boolean',
+                        default: true,
+                        description: 'Copy filters configuration',
+                    },
+                    {
+                        displayName: 'Comments',
+                        name: 'comments',
+                        type: 'boolean',
+                        default: false,
+                        description: 'Copy comments',
+                    },
+                    {
+                        displayName: 'Completion Data',
+                        name: 'completion',
+                        type: 'boolean',
+                        default: false,
+                        description: 'Copy activity completion data',
+                    },
+                    {
+                        displayName: 'Badges',
+                        name: 'badges',
+                        type: 'boolean',
+                        default: false,
+                        description: 'Copy badges',
+                    },
+                    {
+                        displayName: 'Logs',
+                        name: 'logs',
+                        type: 'boolean',
+                        default: false,
+                        description: 'Copy logs',
+                    },
+                    {
+                        displayName: 'Grade Histories',
+                        name: 'gradeHistories',
+                        type: 'boolean',
+                        default: false,
+                        description: 'Copy grade histories',
+                    },
+                    {
+                        displayName: 'Users (Enrollments)',
+                        name: 'users',
+                        type: 'boolean',
+                        default: false,
+                        description: 'Copy user enrollments to the new course',
+                    },
+                ],
             },
 
             // ENROLLMENT FIELDS
@@ -1248,6 +1409,68 @@ export class Moodle implements INodeType {
                                 _shortname: shortname
                             };
                             console.log('Extracted single course from array:', responseData);
+                        }
+                    }
+                    
+                    if (operation === 'duplicate') {
+                        const sourceCourseId = this.getNodeParameter('sourceCourseId', i) as number;
+                        const newFullname = this.getNodeParameter('newFullname', i) as string;
+                        const newShortname = this.getNodeParameter('newShortname', i) as string;
+                        const duplicateCategoryId = this.getNodeParameter('duplicateCategoryId', i) as number;
+                        const duplicateVisible = this.getNodeParameter('duplicateVisible', i) as boolean;
+                        const duplicateOptions = this.getNodeParameter('duplicateOptions', i, {}) as IDataObject;
+
+                        const duplicateParams: IDataObject = {
+                            wsfunction: 'core_course_duplicate_course',
+                            courseid: sourceCourseId,
+                            fullname: newFullname,
+                            shortname: newShortname,
+                        };
+
+                        if (duplicateCategoryId !== undefined && duplicateCategoryId !== null && duplicateCategoryId !== 0) {
+                            duplicateParams.categoryid = duplicateCategoryId;
+                        }
+
+                        if (duplicateVisible !== undefined) {
+                            duplicateParams.visible = duplicateVisible ? 1 : 0;
+                        }
+
+                        const optionNameMap: Record<string, string> = {
+                            activities: 'activities',
+                            blocks: 'blocks',
+                            filters: 'filters',
+                            comments: 'comments',
+                            completion: 'completion',
+                            badges: 'badges',
+                            logs: 'logs',
+                            gradeHistories: 'grade_histories',
+                            users: 'users',
+                        };
+
+                        let optionIndex = 0;
+                        for (const [key, value] of Object.entries(duplicateOptions)) {
+                            if (value === undefined || value === null) continue;
+                            const optionName = optionNameMap[key];
+                            if (!optionName) continue;
+                            duplicateParams[`options[${optionIndex}][name]`] = optionName;
+                            duplicateParams[`options[${optionIndex}][value]`] = value ? 1 : 0;
+                            optionIndex += 1;
+                        }
+
+                        responseData = await moodleApiRequest.call(
+                            this,
+                            'POST',
+                            {},
+                            duplicateParams,
+                            120000 // duplication can be a very slow operation
+                        );
+
+                        // API returns the new course record
+                        if (responseData) {
+                            responseData = {
+                                ...responseData,
+                                _duplicatedFrom: sourceCourseId,
+                            };
                         }
                     }
                     
