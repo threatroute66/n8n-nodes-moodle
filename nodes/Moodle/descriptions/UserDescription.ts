@@ -167,6 +167,13 @@ export const userFields: INodeProperties[] = [
                 description: 'User city',
             },
             {
+                displayName: 'Confirmed',
+                name: 'confirmed',
+                type: 'boolean',
+                default: true,
+                description: 'Whether the user email is confirmed',
+            },
+            {
                 displayName: 'Country',
                 name: 'country',
                 type: 'string',
@@ -181,6 +188,20 @@ export const userFields: INodeProperties[] = [
                 description: 'User description',
             },
             {
+                displayName: 'Email',
+                name: 'email',
+                type: 'string',
+                default: '',
+                description: 'User email address',
+            },
+            {
+                displayName: 'First Name',
+                name: 'firstname',
+                type: 'string',
+                default: '',
+                description: 'User first name',
+            },
+            {
                 displayName: 'ID Number',
                 name: 'idnumber',
                 type: 'string',
@@ -193,6 +214,20 @@ export const userFields: INodeProperties[] = [
                 type: 'string',
                 default: 'en',
                 description: 'User language code',
+            },
+            {
+                displayName: 'Last Name',
+                name: 'lastname',
+                type: 'string',
+                default: '',
+                description: 'User last name',
+            },
+            {
+                displayName: 'Suspended',
+                name: 'suspended',
+                type: 'boolean',
+                default: false,
+                description: 'Whether the user account is suspended',
             },
             {
                 displayName: 'Timezone',
